@@ -31,7 +31,18 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+Verify alignment with `.specify/memory/constitution.md` (Quantum Devs Portfolio Platform):
+
+- **Stack**: React 18+ (strict TS, Redux Toolkit, Tailwind); NestJS + TS; MongoDB + Mongoose
+  with typed, validated schemas.
+- **Architecture**: Backend layered controllers → services → data; frontend atomic components;
+  service-oriented modules on the server.
+- **Type safety**: No `any`; explicit DTOs/interfaces across boundaries.
+- **APIs**: Swagger/OpenAPI documentation for every HTTP endpoint.
+- **UX**: Mobile-first, WCAG baseline, minimalist developer-centric UI; admin uses paginated
+  tables, React Hook Form + Zod, loading skeletons/spinners.
+- **Security & data**: JWT for admin; Zod (client) + class-validator (server) on writes;
+  Mongo references over excessive nesting unless plan justifies otherwise.
 
 ## Project Structure
 

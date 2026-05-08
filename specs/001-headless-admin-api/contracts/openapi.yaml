@@ -1,0 +1,347 @@
+openapi: 3.1.0
+info:
+  title: Quantum Devs Portfolio CMS API
+  version: 0.1.0
+  description: >
+    Headless catalog API with authenticated admin mutations. Public GETs require browser
+    CORS allowlist configuration on the server; admin routes require JWT (Bearer).
+servers:
+  - url: /api
+    description: API prefix (Nest global prefix)
+tags:
+  - name: Public
+    description: Unauthenticated read-only catalog
+  - name: Auth
+    description: Administrator authentication
+  - name: AdminProjects
+    description: Authenticated project management
+  - name: AdminTechnologies
+    description: Authenticated technology catalog management
+paths:
+  /projects:
+    get:
+      tags: [Public]
+      summary: List all projects with technologies populated
+      operationId: publicListProjects
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProjectPublic'
+  /technologies:
+    get:
+      tags: [Public]
+      summary: List all technologies
+      operationId: publicListTechnologies
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TechnologyPublic'
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Administrator login
+      operationId: adminLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Tokens or session payload per implementation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Invalid credentials
+  /admin/projects:
+    get:
+      tags: [AdminProjects]
+      summary: Paginated project list for admin (search, filter, featured)
+      operationId: adminListProjects
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - in: query
+          name: q
+          schema: { type: string }
+          description: Text search (title/description)
+        - in: query
+          name: technologyId
+          schema: { type: string }
+          description: Filter by linked technology ObjectId
+        - in: query
+          name: featured
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: Paginated result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProjects'
+        '401':
+          description: Unauthorized
+    post:
+      tags: [AdminProjects]
+      summary: Create project
+      operationId: adminCreateProject
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectWrite'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectAdmin'
+        '400':
+          description: Validation error
+        '401':
+          description: Unauthorized
+  /admin/projects/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string }
+    get:
+      tags: [AdminProjects]
+      summary: Get single project (admin)
+      operationId: adminGetProject
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectAdmin'
+        '404':
+          description: Not found
+        '401':
+          description: Unauthorized
+    put:
+      tags: [AdminProjects]
+      summary: Update project
+      operationId: adminUpdateProject
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectWrite'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectAdmin'
+        '400':
+          description: Validation error
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not found
+    delete:
+      tags: [AdminProjects]
+      summary: Delete project
+      operationId: adminDeleteProject
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Deleted
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not found
+  /admin/technologies:
+    get:
+      tags: [AdminTechnologies]
+      summary: List technologies (admin; may mirror public)
+      operationId: adminListTechnologies
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TechnologyPublic'
+        '401':
+          description: Unauthorized
+    post:
+      tags: [AdminTechnologies]
+      summary: Create technology
+      operationId: adminCreateTechnology
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TechnologyWrite'
+      responses:
+        '201':
+          description: Created
+        '400':
+          description: Validation error
+        '401':
+          description: Unauthorized
+        '409':
+          description: Duplicate name
+  /admin/technologies/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string }
+    put:
+      tags: [AdminTechnologies]
+      summary: Update technology
+      operationId: adminUpdateTechnology
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TechnologyWrite'
+      responses:
+        '200':
+          description: Updated
+        '400':
+          description: Validation error
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not found
+        '409':
+          description: Duplicate name
+    delete:
+      tags: [AdminTechnologies]
+      summary: Delete technology (blocked if referenced)
+      operationId: adminDeleteTechnology
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Deleted
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not found
+        '409':
+          description: In use by one or more projects
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    TechnologyPublic:
+      type: object
+      required: [_id, name, iconKey, category]
+      properties:
+        _id: { type: string }
+        name: { type: string }
+        iconKey: { type: string }
+        category: { type: string }
+    TechnologyWrite:
+      type: object
+      required: [name, iconKey, category]
+      properties:
+        name: { type: string }
+        iconKey: { type: string }
+        category: { type: string }
+    ProjectPublic:
+      type: object
+      required: [title, description, url, images, featured, technologies]
+      properties:
+        _id: { type: string }
+        title: { type: string }
+        description: { type: string }
+        url: { type: string, format: uri }
+        images:
+          type: array
+          items: { type: string }
+        githubUrl: { type: string, format: uri, nullable: true }
+        featured: { type: boolean }
+        technologies:
+          type: array
+          items:
+            $ref: '#/components/schemas/TechnologyPublic'
+    ProjectWrite:
+      type: object
+      required: [title, description, url, featured, technologyIds]
+      properties:
+        title: { type: string }
+        description: { type: string }
+        url: { type: string, format: uri }
+        images:
+          type: array
+          items: { type: string }
+        githubUrl: { type: string, format: uri, nullable: true }
+        featured: { type: boolean }
+        technologyIds:
+          type: array
+          items: { type: string }
+    ProjectAdmin:
+      allOf:
+        - $ref: '#/components/schemas/ProjectPublic'
+    PaginatedProjects:
+      type: object
+      required: [items, total, page, limit]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectAdmin'
+        total: { type: integer }
+        page: { type: integer }
+        limit: { type: integer }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, format: password }
+    LoginResponse:
+      type: object
+      required: [accessToken]
+      properties:
+        accessToken: { type: string }
+        expiresIn: { type: integer, description: Seconds until expiry }

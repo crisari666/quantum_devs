@@ -3,6 +3,8 @@ alwaysApply: true
 ---
 
 <!-- SPECKIT START -->
-For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan
+Primary plan: `specs/001-headless-admin-api/plan.md`. Also read `specs/001-headless-admin-api/spec.md`,
+`specs/001-headless-admin-api/research.md`, `specs/001-headless-admin-api/data-model.md`,
+`specs/001-headless-admin-api/quickstart.md`, and `specs/001-headless-admin-api/contracts/openapi.yaml`
+for structure, decisions, data shapes, and HTTP contracts.
 <!-- SPECKIT END -->

@@ -5,6 +5,10 @@
 **Status**: Draft  
 **Input**: User description: "$ARGUMENTS"
 
+Functional and non-functional requirements MUST remain consistent with
+`.specify/memory/constitution.md` (portfolio + admin stack, type safety, API documentation,
+validation, JWT admin access, and UI/accessibility expectations).
+
 ## User Scenarios & Testing *(mandatory)*
 
 <!--
