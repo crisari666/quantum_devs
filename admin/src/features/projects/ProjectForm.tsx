@@ -1,12 +1,12 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { z } from 'zod';
 import { Button } from '../../components/Button';
 import { Spinner } from '../../components/Spinner';
 import { TextField } from '../../components/TextField';
-import { ApiError, apiJson } from '../../lib/api';
+import { ApiError, apiAssetUrl, apiFormData, apiJson } from '../../lib/api';
 import { useAppSelector } from '../../store/hooks';
 
 type Technology = { _id: string; name: string; iconKey: string; category: string };
@@ -30,7 +30,6 @@ const projectFormSchema = z
     githubUrl: z.string().optional(),
     featured: z.boolean(),
     technologyIds: z.array(z.string()),
-    imagesText: z.string().optional(),
   })
   .superRefine((val, ctx) => {
     const g = val.githubUrl?.trim();
@@ -53,9 +52,13 @@ export function ProjectForm() {
   const isEdit = Boolean(id);
   const token = useAppSelector((s) => s.auth.token);
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [technologies, setTechnologies] = useState<Technology[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [uploadingImages, setUploadingImages] = useState(false);
   const [initializing, setInitializing] = useState(() => isEdit);
 
   const defaultValues = useMemo(
@@ -67,7 +70,6 @@ export function ProjectForm() {
         githubUrl: '',
         featured: false,
         technologyIds: [] as string[],
-        imagesText: '',
       }) satisfies ProjectFormValues,
     [],
   );
@@ -82,6 +84,12 @@ export function ProjectForm() {
     resolver: zodResolver(projectFormSchema),
     defaultValues,
   });
+
+  useEffect(() => {
+    if (!isEdit) {
+      setImageUrls([]);
+    }
+  }, [isEdit]);
 
   useEffect(() => {
     if (!token) {
@@ -111,8 +119,8 @@ export function ProjectForm() {
           githubUrl: p.githubUrl ?? '',
           featured: p.featured,
           technologyIds: p.technologies.map((t) => t._id),
-          imagesText: (p.images ?? []).join('\n'),
         });
+        setImageUrls(p.images ?? []);
       } catch (e) {
         setLoadError(e instanceof ApiError ? e.message : 'Failed to load project');
       } finally {
@@ -128,16 +136,45 @@ export function ProjectForm() {
     return current.filter((x) => x !== techId);
   };
 
+  const onPickFiles = () => {
+    fileInputRef.current?.click();
+  };
+
+  const onFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const list = e.target.files;
+    if (!list?.length || !token) {
+      e.target.value = '';
+      return;
+    }
+    setUploadError(null);
+    setUploadingImages(true);
+    try {
+      const fd = new FormData();
+      for (const f of Array.from(list)) {
+        fd.append('files', f);
+      }
+      const { urls } = await apiFormData<{ urls: string[] }>('/admin/projects/upload-images', {
+        token,
+        body: fd,
+      });
+      setImageUrls((prev) => [...prev, ...urls]);
+    } catch (err) {
+      setUploadError(err instanceof ApiError ? err.message : 'Image upload failed');
+    } finally {
+      setUploadingImages(false);
+      e.target.value = '';
+    }
+  };
+
+  const removeImageAt = (index: number) => {
+    setImageUrls((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const onSubmit = async (values: ProjectFormValues) => {
     if (!token) {
       return;
     }
     setSubmitError(null);
-    const images =
-      values.imagesText
-        ?.split('\n')
-        .map((l) => l.trim())
-        .filter((l) => l.length > 0) ?? [];
     const githubUrl = values.githubUrl?.trim() ? values.githubUrl.trim() : undefined;
     const payload = {
       title: values.title,
@@ -145,7 +182,7 @@ export function ProjectForm() {
       url: values.url,
       featured: values.featured,
       technologyIds: values.technologyIds,
-      images: images.length > 0 ? images : undefined,
+      images: imageUrls.length > 0 ? imageUrls : undefined,
       githubUrl,
     };
     try {
@@ -185,7 +222,10 @@ export function ProjectForm() {
           </h1>
           <p className="text-sm text-slate-400">Fields are validated with Zod before save.</p>
         </div>
-        <Link to="/projects" className="text-sm text-violet-400 hover:underline">
+        <Link
+          to="/projects"
+          className="cursor-pointer text-sm text-violet-400 transition-colors duration-200 hover:text-violet-300 hover:underline"
+        >
           Back to list
         </Link>
       </div>
@@ -197,7 +237,7 @@ export function ProjectForm() {
         <label className="flex flex-col gap-1 text-left text-sm text-slate-300">
           Description
           <textarea
-            className="min-h-[120px] rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-violet-500 focus:outline-none"
+            className="min-h-[120px] rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-violet-500 focus:outline-none motion-reduce:transition-none"
             {...register('description')}
           />
           {errors.description?.message ? (
@@ -210,13 +250,60 @@ export function ProjectForm() {
           error={errors.githubUrl?.message}
           {...register('githubUrl')}
         />
-        <label className="flex flex-col gap-1 text-left text-sm text-slate-300">
-          Image URLs (one per line)
-          <textarea
-            className="min-h-[80px] rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-violet-500 focus:outline-none"
-            {...register('imagesText')}
+
+        <div className="flex flex-col gap-2 text-left">
+          <span className="text-sm text-slate-300">Project images</span>
+          <p className="text-xs text-slate-500">
+            JPEG, PNG, GIF, or WebP — up to 5MB per file. Images are stored on the server.
+          </p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            name="projectImages"
+            accept="image/jpeg,image/png,image/gif,image/webp,.jpg,.jpeg,.png,.gif,.webp"
+            multiple
+            className="sr-only"
+            onChange={onFileInputChange}
+            aria-label="Select image files from your device"
           />
-        </label>
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={uploadingImages || !token}
+            onClick={onPickFiles}
+            className="w-fit cursor-pointer transition-opacity duration-200 motion-reduce:transition-none"
+          >
+            {uploadingImages ? 'Uploading…' : 'Choose images from device'}
+          </Button>
+          {uploadError ? <p className="text-sm text-rose-400">{uploadError}</p> : null}
+
+          {imageUrls.length > 0 ? (
+            <ul className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {imageUrls.map((src, index) => (
+                <li
+                  key={`${src}-${index}`}
+                  className="group relative overflow-hidden rounded-md border border-slate-700 bg-slate-900"
+                >
+                  <img
+                    src={apiAssetUrl(src)}
+                    alt=""
+                    className="aspect-video w-full object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeImageAt(index)}
+                    className="absolute right-1 top-1 cursor-pointer rounded bg-slate-950/80 px-2 py-1 text-xs text-slate-100 transition-colors duration-200 hover:bg-rose-600 motion-reduce:transition-none"
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-slate-500">No images yet.</p>
+          )}
+        </div>
+
         <label className="flex items-center gap-2 text-sm text-slate-200">
           <input type="checkbox" {...register('featured')} />
           Featured
@@ -232,7 +319,7 @@ export function ProjectForm() {
                 {technologies.map((t) => {
                   const checked = field.value.includes(t._id);
                   return (
-                    <label key={t._id} className="flex items-center gap-2">
+                    <label key={t._id} className="flex cursor-pointer items-center gap-2">
                       <input
                         type="checkbox"
                         checked={checked}
@@ -258,10 +345,19 @@ export function ProjectForm() {
         {submitError ? <p className="text-sm text-rose-400">{submitError}</p> : null}
 
         <div className="flex gap-2">
-          <Button type="submit" disabled={isSubmitting}>
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="cursor-pointer transition-opacity duration-200 motion-reduce:transition-none"
+          >
             {isSubmitting ? 'Saving…' : 'Save'}
           </Button>
-          <Button type="button" variant="ghost" onClick={() => navigate('/projects')}>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => navigate('/projects')}
+            className="cursor-pointer transition-opacity duration-200 motion-reduce:transition-none"
+          >
             Cancel
           </Button>
         </div>

@@ -1,10 +1,23 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { existsSync, mkdirSync } from 'fs';
+import { join } from 'path';
 import { AppModule } from './app.module';
+import { PROJECT_IMAGES_DIR } from './projects/project-image-upload.config';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  if (!existsSync(PROJECT_IMAGES_DIR)) {
+    mkdirSync(PROJECT_IMAGES_DIR, { recursive: true });
+  }
+
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  app.useStaticAssets(join(process.cwd(), 'uploads'), {
+    prefix: '/api/uploads/',
+    index: false,
+    fallthrough: true,
+  });
   const origins =
     process.env.CORS_ORIGINS?.split(',')
       .map((o) => o.trim())

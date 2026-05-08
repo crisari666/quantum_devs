@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -8,10 +9,15 @@ import {
   Post,
   Put,
   Query,
+  UploadedFiles,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
   ApiCreatedResponse,
   ApiNoContentResponse,
   ApiOkResponse,
@@ -22,6 +28,7 @@ import {
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { ProjectWriteDto } from './dto/project-write.dto';
+import { projectImagesMulterOptions } from './project-image-upload.config';
 import { ProjectsService } from './projects.service';
 import { TechnologyDocument } from '../technologies/schemas/technology.schema';
 
@@ -60,6 +67,33 @@ export class ProjectsAdminController {
       page,
       limit,
     };
+  }
+
+  @Post('upload-images')
+  @ApiOperation({
+    summary: 'Upload project images (JPEG, PNG, GIF, WebP; max 5MB each)',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['files'],
+      properties: {
+        files: {
+          type: 'array',
+          items: { type: 'string', format: 'binary' },
+        },
+      },
+    },
+  })
+  @ApiOkResponse({ description: 'Public URL paths for stored files' })
+  @UseInterceptors(FilesInterceptor('files', 20, projectImagesMulterOptions))
+  async uploadImages(@UploadedFiles() files: Express.Multer.File[]) {
+    if (!files?.length) {
+      throw new BadRequestException('No image files provided');
+    }
+    const urls = files.map((f) => `/uploads/projects/${f.filename}`);
+    return { urls };
   }
 
   @Post()

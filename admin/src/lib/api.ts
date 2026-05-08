@@ -6,6 +6,16 @@ export function getApiBase(): string {
   return base.replace(/\/$/, '');
 }
 
+/** Resolve stored project image paths (e.g. `/uploads/...`) or absolute URLs for `<img src>`. */
+export function apiAssetUrl(pathOrUrl: string): string {
+  if (/^https?:\/\//i.test(pathOrUrl)) {
+    return pathOrUrl;
+  }
+  const base = getApiBase();
+  const path = pathOrUrl.startsWith('/') ? pathOrUrl : `/${pathOrUrl}`;
+  return `${base}${path}`;
+}
+
 export class ApiError extends Error {
   readonly status: number;
 
@@ -49,6 +59,42 @@ export async function apiJson<T>(
   }
   if (res.status === 204) {
     return undefined as T;
+  }
+  return (await res.json()) as T;
+}
+
+export async function apiFormData<T>(
+  path: string,
+  options: RequestInit & { token?: string | null; body: FormData },
+): Promise<T> {
+  const { token, body, ...init } = options;
+  const url = `${getApiBase()}${path.startsWith('/') ? path : `/${path}`}`;
+  const headers = new Headers(init.headers);
+  if (!headers.has('Accept')) {
+    headers.set('Accept', 'application/json');
+  }
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+  const res = await fetch(url, {
+    ...init,
+    method: init.method ?? 'POST',
+    body,
+    headers,
+  });
+  if (!res.ok) {
+    let message = res.statusText;
+    try {
+      const parsed = (await res.json()) as { message?: string | string[] };
+      if (typeof parsed.message === 'string') {
+        message = parsed.message;
+      } else if (Array.isArray(parsed.message)) {
+        message = parsed.message.join(', ');
+      }
+    } catch {
+      // ignore
+    }
+    throw new ApiError(message, res.status);
   }
   return (await res.json()) as T;
 }
