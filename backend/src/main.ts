@@ -23,18 +23,18 @@ async function bootstrap() {
       .map((o) => o.trim())
       .filter(Boolean) ?? [];
   app.enableCors({
-    origin: origins.length > 0 ? origins : false,
-    credentials: true,
+    origin: '*'
+    // credentials: true,
   });
   app.setGlobalPrefix('api');
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-      transformOptions: { enableImplicitConversion: true },
-    }),
-  );
+  // app.useGlobalPipes(
+  //   new ValidationPipe({
+  //     whitelist: true,
+  //     forbidNonWhitelisted: true,
+  //     transform: true,
+  //     transformOptions: { enableImplicitConversion: true },
+  //   }),
+  // );
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Quantum Devs Portfolio CMS API')
