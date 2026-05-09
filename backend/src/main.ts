@@ -5,6 +5,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { AppModule } from './app.module';
+import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { PROJECT_IMAGES_DIR } from './projects/project-image-upload.config';
 
 async function bootstrap() {
@@ -13,6 +14,7 @@ async function bootstrap() {
   }
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  app.useGlobalInterceptors(new LoggingInterceptor());
   app.useStaticAssets(join(process.cwd(), 'uploads'), {
     prefix: '/api/uploads/',
     index: false,
@@ -23,7 +25,7 @@ async function bootstrap() {
       .map((o) => o.trim())
       .filter(Boolean) ?? [];
   app.enableCors({
-    origin: '*'
+    origin: '*',
     // credentials: true,
   });
   app.setGlobalPrefix('api');
